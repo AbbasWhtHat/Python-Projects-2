@@ -1,0 +1,87 @@
+# Text Data Preprocessing Lib
+from data_preprocessing import get_stem_words
+import tensorflow
+import random
+import numpy as np
+import pickle
+import json
+import nltk
+nltk.download('punkt')
+nltk.download('wordnet')
+
+# words to be igonred/omitted while framing the dataset
+ignore_words = ['?', '!', ',', '.', "'s", "'m"]
+
+
+# Model Load Lib
+
+# load the model
+model = tensorflow.keras.models.load_model('./chatbot_model.h5')
+
+# Load data files
+intents = json.loads(open('./intents.json').read())
+words = pickle.load(open('./words.pkl', 'rb'))
+classes = pickle.load(open('./classes.pkl', 'rb'))
+
+
+def preprocess_user_input(user_input):
+
+    bag = []
+    bag_of_words = []
+
+    # tokenize the user_input
+    input_word_token_1 = nltk.word_tokenize(user_input)
+
+    # convert the user input into its root words : stemming
+    input_word_token_2 = get_stem_words(input_word_token_1, ignore_words)
+
+    # Remove duplicacy and sort the user_input
+    input_word_token_2 = sorted(list(set(input_word_token_2)))
+
+    # Input data encoding : Create BOW for user_input
+    for word in words:
+        if word in input_word_token_2:
+            bag_of_words.append(1)
+        else:
+            bag_of_words.append(0)
+    bag.append(bag_of_words)
+
+    return np.array(bag)
+
+
+def bot_class_prediction(user_input):
+    inp = preprocess_user_input(user_input)
+
+    prediction = model.predict(inp)
+
+    predicted_class_label = np.argmax(prediction[0])
+
+    return predicted_class_label
+
+
+def bot_response(user_input):
+
+    predicted_class_label = bot_class_prediction(user_input)
+
+    # extract the class from the predicted_class_label
+    predicted_class = classes[predicted_class_label]
+
+    # now we have the predicted tag, select a random response
+
+    for intent in intents['intents']:
+        if intent['tag'] == predicted_class:
+
+           # choose a random bot response
+            bot_response = random.choice(intent['responses'])
+
+            return bot_response
+
+
+print("Hi I am Stella, How Can I help you?")
+
+while True:
+    user_input = input("Type your message here:")
+    print("User Input: ", user_input)
+
+    response = bot_response(user_input)
+    print("Bot Response: ", response)
